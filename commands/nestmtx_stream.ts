@@ -316,49 +316,75 @@ export default class NestmtxStream extends BaseCommand {
 
   #startOutputStreamer() {
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
-    const isVAAPI = env.get('FFMPEG_HW_ACCELERATOR') === 'vaapi';
-
     const ffmpegArgs = [
-      '-loglevel', env.get('FFMPEG_DEBUG_LEVEL', 'debug'),
-      '-hwaccel', 'vaapi',
-      '-vaapi_device', '/dev/dri/renderD128',
-      '-hwaccel_output_format', 'vaapi',
+      '-loglevel',
+      env.get('FFMPEG_DEBUG_LEVEL', 'warning'),
+      '-fflags',
+      '+discardcorrupt', // Ignore corrupted frames
 
-      ...(isVAAPI ? ['-init_hw_device', 'vaapi=/dev/dri/renderD128'] : []),
+      // Hardware-accelerated decoding arguments
+      ...this.#hardwareAcceleratedDecodingArguments,
 
-      // Input from pipe
-      '-i', 'pipe:3',
+      // Input from pipe:3
+      '-i',
+      `pipe:3`,
 
-      // Filters: convert to NV12, upload to GPU
-      ...(isVAAPI ? ['-vf', 'format=nv12,hwupload=0'] : []),
+      // Hardware-accelerated encoding arguments (no conflict now)
+      ...this.#hardwareAcceleratedEncodingArguments,
 
-      // Encoding
-      '-c:v', isVAAPI ? 'h264_vaapi' : 'libx264',
-      '-b:v', '1000k',
-      '-r', '10',
-      '-pix_fmt', isVAAPI ? 'vaapi_vld' : 'yuv420p',
+      // Other video options such as tune, bitrate, etc.
+      '-tune',
+      'zerolatency', // Tune for low latency
+      '-x264opts',
+      'bframes=0', // No B-frames
+      '-preset',
+      'ultrafast', // Ultrafast preset
+      '-b:v',
+      '100k', // Set video bitrate dynamically
+      '-r',
+      '10', // Set frame rate dynamically
 
-      // Audio
-      '-c:a', 'aac',
-      '-b:a', '128k',
+      // Set pixel format to avoid deprecated warning
+      '-pix_fmt',
+      'yuv420p',
 
-      // Bitstream filter to ensure SPS/PPS headers are present
-      '-bsf:v', 'h264_mp4toannexb',
+      // AAC Audio Stream (track 1)
+      '-c:a:0',
+      'aac',
+      '-b:a:0',
+      '128k', // Audio bitrate for AAC
 
-      // Output
-      '-f', 'mpegts',
-      `${this.#destination}`,
-    ];
+      // Opus Audio Stream (track 2)
+      '-c:a:1',
+      'libopus',
+      '-b:a:1',
+      '128k', // Audio bitrate for Opus
+
+      // Explicit Mapping of Video and Audio Streams
+      '-map',
+      '0:v:0', // Map the first video track (H.264)
+      '-map',
+      '0:a:0', // Map the first audio track (AAC)
+      '-map',
+      '0:a:1', // Map the second audio track (Opus)
+
+      // Output Format
+      '-f',
+      'mpegts', // Set the format to MPEG-TS
+      '-use_wallclock_as_timestamps',
+      '1',
+
+      // Destination (SRT or other media server)
+      `"${this.#destination}"`, // Destination path (quoted)
+    ]
+
+    this.#outputStreamLogger.warn("ffmpeg arguments: " + ffmpegArgs);
 
     this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
       stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
       reject: false,
       shell: true,
       signal: this.#abortController.signal,
-      // env: {
-      //   ...process.env,
-      //   LIBVA_DRIVER_NAME: 'iHD', // or 'i965' based on your hardware
-      // }
     })
     this.#streamer.stdout!.on('data', (data) => {
       data
@@ -454,15 +480,14 @@ export default class NestmtxStream extends BaseCommand {
       ...this.#hardwareAcceleratedEncodingArguments,
       '-profile:v',
       'main',
-      // '-tune',
-      // 'zerolatency',
+      '-tune',
+      'zerolatency',
       '-r',
       '25',
       '-s',
       size,
       '-pix_fmt',
-      // 'yuv420p',
-      'vaapi',
+      'yuv420p',
 
       // AAC Audio Stream (track 1)
       '-c:a:0',
@@ -492,6 +517,8 @@ export default class NestmtxStream extends BaseCommand {
       '1',
       `unix:${this.#streamerPassthroughSock}`, // Send output to Unix socket
     ]
+
+    this.#staticStreamLogger.warn("ffmpeg arguments: " + ffmpegArgs);
 
     this.#staticStreamer = execa(ffmpegBinary, ffmpegArgs, {
       stdio: 'pipe',
@@ -629,12 +656,12 @@ export default class NestmtxStream extends BaseCommand {
       ...this.#hardwareAcceleratedEncodingArguments,
 
       // Single H.264 Video Stream (without B-frames)
-      // '-tune',
-      // 'zerolatency', // Tune for low latency
-      // '-x264opts',
-      // 'bframes=0', // No B-frames
-      // '-preset',
-      // 'ultrafast', // Ultrafast preset
+      '-tune',
+      'zerolatency', // Tune for low latency
+      '-x264opts',
+      'bframes=0', // No B-frames
+      '-preset',
+      'ultrafast', // Ultrafast preset
       `-b:v`,
       `${videoBitrate}k`, // Set video bitrate dynamically
       ...videoSizeArguments,
@@ -647,8 +674,7 @@ export default class NestmtxStream extends BaseCommand {
 
       // Set pixel format to avoid deprecated warning
       '-pix_fmt',
-      // 'yuv420p',
-      'vaapi',
+      'yuv420p',
 
       // AAC Audio Stream
       '-c:a:0',
@@ -680,6 +706,8 @@ export default class NestmtxStream extends BaseCommand {
       '-threads',
       '1',
     ]
+
+    this.#cameraStreamLogger.warn("rtsp ffmpeg arguments: " + ffmpegArgs);
 
     this.#connectingStreamAbortController.abort()
     this.#cameraStreamLogger.info(`Starting FFMpeg with RTSP stream`)
@@ -955,7 +983,6 @@ t=0 0
 
 m=video ${videoPort} RTP/AVP 97
 a=rtpmap:97 H264/90000
-a=fmtp:97 packetization-mode=1; sprop-parameter-sets=Z0IAH6WgKA9sBEAAAMAAQAAAwB4eDAB,aM4BHF6w
 a=recvonly
 a=rtcp:${videoRTCPPort}
 
@@ -976,10 +1003,7 @@ a=rtcp:${audioRTCPPort}
       '-protocol_whitelist',
       'file,crypto,data,udp,rtp',
       '-fflags',
-      '+genpts+discardcorrupt+nobuffer', // Ignore corrupted frames and minimize buffering
-      '-protocol_whitelist', 'file,udp,rtp,rtsp,tcp',
-      '-rtsp_transport', 'tcp',
-      '-bsf:v', 'h264_mp4toannexb',
+      '+discardcorrupt+nobuffer', // Ignore corrupted frames and minimize buffering
 
       // Hardware-accelerated decoding arguments
       ...this.#hardwareAcceleratedDecodingArguments,
@@ -991,12 +1015,12 @@ a=rtcp:${audioRTCPPort}
       // Hardware-accelerated encoding arguments (no conflict now)
       ...this.#hardwareAcceleratedEncodingArguments,
 
-      // '-tune',
-      // 'zerolatency', // Tune for low latency
-      // '-x264opts',
-      // 'bframes=0', // No B-frames
-      // '-preset',
-      // 'ultrafast', // Ultrafast preset
+      '-tune',
+      'zerolatency', // Tune for low latency
+      '-x264opts',
+      'bframes=0', // No B-frames
+      '-preset',
+      'ultrafast', // Ultrafast preset
       '-b:v',
       '100k',
       '-r',
@@ -1006,8 +1030,7 @@ a=rtcp:${audioRTCPPort}
       '-s',
       '1920x1080', // Set video size
       '-pix_fmt',
-      // 'yuv420p',
-      'vaapi',
+      'yuv420p',
 
       // Set buffer size and limit delay
       '-bufsize',
@@ -1050,6 +1073,8 @@ a=rtcp:${audioRTCPPort}
       '-threads',
       '1',
     ]
+
+    this.#cameraStreamLogger.warn("webrtc ffmpeg arguments: " + ffmpegArgs);
 
     this.#cameraStreamer = execa(ffmpegBinary, ffmpegArgs, {
       stdio: 'pipe',
