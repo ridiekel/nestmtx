@@ -992,47 +992,58 @@ a=rtcp:${audioRTCPPort}
     const ffmpegArgs: string[] = [
       '-y',
       '-hide_banner',
-      '-loglevel', env.get('FFMPEG_LOG_LEVEL', 'warning'),
+      '-loglevel', env.get('FFMPEG_LOG_LEVEL', 'debug'), // Switch to debug for more verbose logs
       '-protocol_whitelist', 'file,crypto,data,udp,rtp',
-      '-fflags', '+discardcorrupt+nobuffer',
+      '-fflags', '+discardcorrupt+nobuffer+genpts',
+      '-avoid_negative_ts', 'make_zero', // Prevent negative timestamps
       '-use_wallclock_as_timestamps', '1',
-      '-fflags', '+genpts',
 
       // Hardware-accelerated decoding
       '-hwaccel', 'vaapi',
       '-hwaccel_device', '/dev/dri/renderD128',
       '-hwaccel_output_format', 'vaapi',
 
+      // Input SDP
       '-i', `${this.#streamerFFMpegInputSdp}`,
 
       // Hardware-accelerated encoding
       '-c:v', 'h264_vaapi',
-      '-qp', '20',
-      '-g', '30',
-      '-vf', 'format=nv12,hwupload,scale_vaapi=w=1920:h=1080',
-      '-r', '10',
-      '-b:v', '100k',
-      '-bufsize', '100k',
-      '-max_delay', '500000',
+      '-qp', '23',                // Adjust for better quality-control
+      '-g', '30',                 // GOP size for low latency
+      '-bf', '0',                 // Disable B-frames
+      '-r', '10',                 // Frame rate
+      '-vf', 'format=nv12,hwupload,scale_vaapi=w=1920:h=1080', // Explicit format conversion and scaling
+      '-pix_fmt', 'vaapi',
 
-      // Audio
+      // Bitrate control
+      '-b:v', '200k',
+      '-minrate', '200k',
+      '-maxrate', '200k',
+      '-bufsize', '200k',
+      '-max_delay', '300000', // Reduce max delay for tighter real-time constraints
+
+      // Audio settings
       '-c:a:0', 'aac',
       '-b:a:0', '128k',
       '-c:a:1', 'libopus',
       '-b:a:1', '128k',
+      '-async', '1', // Sync audio with video more tightly
 
-      // Mapping
+      // Mapping inputs
       '-map', '0:v',
       '-map', '0:a',
       '-map', '0:a',
 
-      // Muxing
+      // Muxing settings
       '-f', 'mpegts',
-      '-muxdelay', '0.2',
-      '-muxpreload', '0.1',
-      '-flush_packets', '1',
+      '-muxdelay', '0.1',         // Reduce muxing delay
+      '-muxpreload', '0.05',      // Reduce preload time
+      '-flush_packets', '1',      // Force immediate packet flushing
 
+      // Output
       `unix:${this.#cameraPassthroughSock}`,
+
+      // Thread management
       '-threads', '1',
     ];
 
