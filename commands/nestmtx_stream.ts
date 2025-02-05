@@ -318,6 +318,8 @@ export default class NestmtxStream extends BaseCommand {
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg');
     const disableTranscoding = env.get('FFMPEG_DISABLE_TRANSCODING', 'false') === 'true';
 
+    this.#outputStreamLogger.info("Disable transcoding: " + disableTranscoding)
+
     const ffmpegArgs = [
       '-loglevel',
       env.get('FFMPEG_DEBUG_LEVEL', 'warning'),
