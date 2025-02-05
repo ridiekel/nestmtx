@@ -11,6 +11,10 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositori
     echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
     echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && \
     apk --no-cache add dumb-init \
+    mesa-dri-gallium \
+    intel-media-driver \
+    libva-intel-driver \
+    libva-utils \
     openssl \
     ffmpeg \
     gstreamer-tools \
@@ -95,7 +99,6 @@ ENV NODE_ENV=production
 ARG VERSION=unknown
 ARG BUILDPLATFORM=local
 ARG SHA=unknown
-RUN apk add --no-cache mesa-dri-gallium intel-media-driver libva-intel-driver libva-utils
 USER node
 COPY --from=production-dependencies /home/node/app/node_modules /home/node/app/node_modules
 COPY --from=build /home/node/app/build /home/node/app
