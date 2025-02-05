@@ -645,7 +645,7 @@ export default class NestmtxStream extends BaseCommand {
       ...(!disableTranscoding ? this.#hardwareAcceleratedDecodingArguments : []),
 
       '-i',
-      `${src}`, // Input source (RTSP stream)
+      `"${rtspSrc}"`, // Input RTSP stream with quotes
 
       // Retry options for network issues
       '-rtsp_transport',
