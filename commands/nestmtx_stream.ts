@@ -346,7 +346,8 @@ export default class NestmtxStream extends BaseCommand {
 
       // Set pixel format to avoid deprecated warning
       '-pix_fmt',
-      'yuv420p',
+      // 'yuv420p',
+      'vaapi',
 
       // AAC Audio Stream (track 1)
       '-c:a:0',
@@ -485,7 +486,8 @@ export default class NestmtxStream extends BaseCommand {
       '-s',
       size,
       '-pix_fmt',
-      'yuv420p',
+      // 'yuv420p',
+      'vaapi',
 
       // AAC Audio Stream (track 1)
       '-c:a:0',
@@ -670,7 +672,8 @@ export default class NestmtxStream extends BaseCommand {
 
       // Set pixel format to avoid deprecated warning
       '-pix_fmt',
-      'yuv420p',
+      // 'yuv420p',
+      'vaapi',
 
       // AAC Audio Stream
       '-c:a:0',
@@ -1024,7 +1027,8 @@ a=rtcp:${audioRTCPPort}
       '-s',
       '1920x1080', // Set video size
       '-pix_fmt',
-      'yuv420p',
+      // 'yuv420p',
+      'vaapi',
 
       // Set buffer size and limit delay
       '-bufsize',

@@ -108,7 +108,7 @@ RUN rm -rf /home/node/app/public
 COPY --from=gui /home/node/app/.output/public /home/node/app/public
 COPY --from=build /home/node/mediamtx /home/node/mediamtx
 USER root
-RUN chown -R node:node /home/node
+#RUN chown -R node:node /home/node
 RUN { \
     echo "VERSION=${VERSION}"; \
     echo "BUILDPLATFORM=${BUILDPLATFORM}"; \
