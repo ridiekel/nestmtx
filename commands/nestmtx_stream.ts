@@ -323,13 +323,14 @@ export default class NestmtxStream extends BaseCommand {
       '-hwaccel', 'vaapi',
       '-vaapi_device', '/dev/dri/renderD128',
       '-hwaccel_output_format', 'vaapi',
-      '-filter_hw_device', '/dev/dri/renderD128',
+
+      ...(isVAAPI ? ['-init_hw_device', 'vaapi=/dev/dri/renderD128'] : []),
 
       // Input from pipe
       '-i', 'pipe:3',
 
       // Filters: convert to NV12, upload to GPU
-      ...(isVAAPI ? ['-vf', 'format=nv12,hwupload'] : []),
+      ...(isVAAPI ? ['-vf', 'format=nv12,hwupload=0'] : []),
 
       // Encoding
       '-c:v', isVAAPI ? 'h264_vaapi' : 'libx264',
