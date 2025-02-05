@@ -374,12 +374,12 @@ export default class NestmtxStream extends BaseCommand {
       ),
 
       // Output format
-      ...(!disableTranscoding
-          ? [
+      // ...(!disableTranscoding
+      //     ? [
             '-f', 'mpegts', // Set the output format to MPEG-TS
-          ]
-          : []
-      ),
+          // ]
+          // : []
+      // ),
       '-use_wallclock_as_timestamps', '1', // Use wallclock as timestamps
 
       // Destination (SRT or other media server)
