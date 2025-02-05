@@ -1033,7 +1033,7 @@ a=rtcp:${audioRTCPPort}
       '-flush_packets', '1',
 
       `unix:${this.#cameraPassthroughSock}`,
-      '-threads', '2',
+      '-threads', '1',
     ];
 
     this.#cameraStreamer = execa(ffmpegBinary, ffmpegArgs, {
