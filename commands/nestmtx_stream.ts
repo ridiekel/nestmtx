@@ -333,12 +333,12 @@ export default class NestmtxStream extends BaseCommand {
       ...this.#hardwareAcceleratedEncodingArguments,
 
       // Other video options such as tune, bitrate, etc.
-      '-tune',
-      'zerolatency', // Tune for low latency
-      '-x264opts',
-      'bframes=0', // No B-frames
-      '-preset',
-      'ultrafast', // Ultrafast preset
+      // '-tune',
+      // 'zerolatency', // Tune for low latency
+      // '-x264opts',
+      // 'bframes=0', // No B-frames
+      // '-preset',
+      // 'ultrafast', // Ultrafast preset
       '-b:v',
       '100k', // Set video bitrate dynamically
       '-r',
@@ -479,8 +479,8 @@ export default class NestmtxStream extends BaseCommand {
       ...this.#hardwareAcceleratedEncodingArguments,
       '-profile:v',
       'main',
-      '-tune',
-      'zerolatency',
+      // '-tune',
+      // 'zerolatency',
       '-r',
       '25',
       '-s',
@@ -654,12 +654,12 @@ export default class NestmtxStream extends BaseCommand {
       ...this.#hardwareAcceleratedEncodingArguments,
 
       // Single H.264 Video Stream (without B-frames)
-      '-tune',
-      'zerolatency', // Tune for low latency
-      '-x264opts',
-      'bframes=0', // No B-frames
-      '-preset',
-      'ultrafast', // Ultrafast preset
+      // '-tune',
+      // 'zerolatency', // Tune for low latency
+      // '-x264opts',
+      // 'bframes=0', // No B-frames
+      // '-preset',
+      // 'ultrafast', // Ultrafast preset
       `-b:v`,
       `${videoBitrate}k`, // Set video bitrate dynamically
       ...videoSizeArguments,
@@ -1012,12 +1012,12 @@ a=rtcp:${audioRTCPPort}
       // Hardware-accelerated encoding arguments (no conflict now)
       ...this.#hardwareAcceleratedEncodingArguments,
 
-      '-tune',
-      'zerolatency', // Tune for low latency
-      '-x264opts',
-      'bframes=0', // No B-frames
-      '-preset',
-      'ultrafast', // Ultrafast preset
+      // '-tune',
+      // 'zerolatency', // Tune for low latency
+      // '-x264opts',
+      // 'bframes=0', // No B-frames
+      // '-preset',
+      // 'ultrafast', // Ultrafast preset
       '-b:v',
       '100k',
       '-r',
