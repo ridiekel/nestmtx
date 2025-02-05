@@ -11,6 +11,10 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositori
     echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
     echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && \
     apk --no-cache add dumb-init \
+    mesa-dri-gallium \
+    intel-media-driver \
+    libva-intel-driver \
+    libva-utils \
     openssl \
     ffmpeg \
     gstreamer-tools \
