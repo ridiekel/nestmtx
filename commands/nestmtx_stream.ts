@@ -381,7 +381,7 @@ export default class NestmtxStream extends BaseCommand {
       '-use_wallclock_as_timestamps', '1', // Use wallclock as timestamps
 
       // Destination (SRT or other media server)
-      `${this.#destination}`, // Destination path
+      `"${this.#destination}"`, // Destination path
     ];
 
     this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
@@ -525,7 +525,7 @@ export default class NestmtxStream extends BaseCommand {
       '-use_wallclock_as_timestamps',
       '1', // Use wallclock timestamps for synchronization
 
-      `unix:${this.#streamerPassthroughSock}`, // Send the output to a Unix socket
+      `"unix:${this.#streamerPassthroughSock}"`, // Send the output to a Unix socket
     ];
 
     this.#staticStreamer = execa(ffmpegBinary, ffmpegArgs, {
