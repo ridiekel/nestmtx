@@ -56,8 +56,8 @@ export const getHardwareAcceleratedEncodingArgumentsFor = (
 
     case 'vaapi':
       return [
-        '-vf',
-        'format="nv12,hwupload"',
+        // '-vf',
+        // 'format="nv12,hwupload"',
         '-c:v',
         'h264_vaapi',
         '-pix_fmt', 'vaapi',
