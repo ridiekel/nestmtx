@@ -118,6 +118,7 @@ export default await Env.create(new URL('../', import.meta.url), {
    * FFmpeg Configuration
    */
   FFMPEG_BIN: Env.schema.string.optional(),
+  FFMPEG_DISABLE_TRANSCODING: Env.schema.boolean.optional(),
   FFMPEG_HW_ACCELERATOR: Env.schema.string.optional(),
   FFMPEG_HW_ACCELERATOR_DEVICE: Env.schema.string.optional(),
   FFMPEG_DEBUG_LEVEL: Env.schema.enum.optional([
