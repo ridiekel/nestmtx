@@ -1005,6 +1005,9 @@ a=rtcp:${audioRTCPPort}
       '-fflags',
       '+discardcorrupt+nobuffer', // Ignore corrupted frames and minimize buffering
 
+      '-init_hw_device', 'vaapi=/dev/dri/renderD128',
+      '-filter_hw_device', '/dev/dri/renderD128',
+
       // Hardware-accelerated decoding arguments
       ...this.#hardwareAcceleratedDecodingArguments,
 
