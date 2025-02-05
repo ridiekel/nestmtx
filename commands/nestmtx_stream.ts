@@ -360,9 +360,16 @@ export default class NestmtxStream extends BaseCommand {
       ),
 
       // Explicit mapping of video and audio streams
-      '-map', '0:v:0', // Map the first video track (H.264)
-      '-map', '0:a:0', // Map the first audio track (AAC)
-      '-map', '0:a:1', // Map the second audio track (Opus)
+      ...(!disableTranscoding
+          ? [
+            '-map', '0:v:0', // Map the first video track (H.264)
+            '-map', '0:a:0', // Map the first audio track (AAC)
+            '-map', '0:a:1', // Map the second audio track (Opus)
+          ]
+          : [
+            '-map', '0', // Map all streams when transcoding is disabled
+          ]
+      ),
 
       // Output format
       '-f', 'mpegts', // Set the output format to MPEG-TS
@@ -370,7 +377,7 @@ export default class NestmtxStream extends BaseCommand {
 
       // Destination (SRT or other media server)
       `${this.#destination}`, // Destination path
-    ]
+    ];
 
     this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
       stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
