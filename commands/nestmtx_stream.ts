@@ -1000,6 +1000,8 @@ a=rtcp:${audioRTCPPort}
       'file,crypto,data,udp,rtp',
       '-fflags',
       '+discardcorrupt+nobuffer', // Ignore corrupted frames and minimize buffering
+      '-init_hw_device',
+      'vaapi=va:/dev/dri/renderD128', '-filter_hw_device', 'va',
 
       // Hardware-accelerated decoding arguments (only if transcoding is enabled)
       ...(!disableTranscoding ? this.#hardwareAcceleratedDecodingArguments : []),
