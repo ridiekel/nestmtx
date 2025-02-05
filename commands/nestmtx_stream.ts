@@ -378,7 +378,7 @@ export default class NestmtxStream extends BaseCommand {
       `"${this.#destination}"`, // Destination path (quoted)
     ]
 
-    this.#outputStreamLogger.warn("ffmpeg arguments: " + ffmpegArgs);
+    this.#outputStreamLogger.info("*** ffmpeg arguments: " + ffmpegArgs);
 
     this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
       stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
@@ -518,7 +518,7 @@ export default class NestmtxStream extends BaseCommand {
       `unix:${this.#streamerPassthroughSock}`, // Send output to Unix socket
     ]
 
-    this.#staticStreamLogger.warn("ffmpeg arguments: " + ffmpegArgs);
+    this.#staticStreamLogger.info("*** ffmpeg arguments: " + ffmpegArgs);
 
     this.#staticStreamer = execa(ffmpegBinary, ffmpegArgs, {
       stdio: 'pipe',
@@ -707,7 +707,7 @@ export default class NestmtxStream extends BaseCommand {
       '1',
     ]
 
-    this.#cameraStreamLogger.warn("rtsp ffmpeg arguments: " + ffmpegArgs);
+    this.#cameraStreamLogger.info("*** rtsp ffmpeg arguments: " + ffmpegArgs);
 
     this.#connectingStreamAbortController.abort()
     this.#cameraStreamLogger.info(`Starting FFMpeg with RTSP stream`)
@@ -1074,7 +1074,7 @@ a=rtcp:${audioRTCPPort}
       '1',
     ]
 
-    this.#cameraStreamLogger.warn("webrtc ffmpeg arguments: " + ffmpegArgs);
+    this.#cameraStreamLogger.info("*** webrtc ffmpeg arguments: " + ffmpegArgs);
 
     this.#cameraStreamer = execa(ffmpegBinary, ffmpegArgs, {
       stdio: 'pipe',
