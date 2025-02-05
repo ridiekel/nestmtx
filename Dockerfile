@@ -95,6 +95,7 @@ ENV NODE_ENV=production
 ARG VERSION=unknown
 ARG BUILDPLATFORM=local
 ARG SHA=unknown
+RUN apk add --no-cache mesa-dri-gallium intel-media-driver libva-intel-driver libva-utils
 USER node
 COPY --from=production-dependencies /home/node/app/node_modules /home/node/app/node_modules
 COPY --from=build /home/node/app/build /home/node/app
