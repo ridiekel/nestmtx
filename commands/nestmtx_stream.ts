@@ -506,6 +506,7 @@ export default class NestmtxStream extends BaseCommand {
             '-r', '25', // Set frame rate to 25 FPS
             '-s', size, // Set the video resolution dynamically
             '-pix_fmt', 'yuv420p', // Set pixel format for broad compatibility
+            '-vf', 'format=nv12,hwupload',
 
             // AAC Audio Stream (track 1)
             '-c:a:0', 'aac', // Use AAC codec for the first audio stream
@@ -689,6 +690,7 @@ export default class NestmtxStream extends BaseCommand {
 
             // Set pixel format
             '-pix_fmt', 'yuv420p',
+            '-vf', 'format=nv12,hwupload',
 
             // AAC Audio Stream
             '-c:a:0', 'aac', // Use AAC codec for the first audio stream
@@ -1040,6 +1042,7 @@ a=rtcp:${audioRTCPPort}
             // Set the size and pixel format
             '-s', '1920x1080', // Set video size
             '-pix_fmt', 'yuv420p', // Set pixel format
+            '-vf', 'format=nv12,hwupload',
 
             // Set buffer size and limit delay
             '-bufsize', '100k', // Buffer size equal to bitrate
