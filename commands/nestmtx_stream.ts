@@ -990,83 +990,51 @@ a=rtcp:${audioRTCPPort}
     this.#connectingStreamAbortController.abort()
     this.#cameraStreamLogger.info(`Starting FFMpeg with WebRTC stream`)
     const ffmpegArgs: string[] = [
-      '-y', // Overwrite output files
-      '-hide_banner', // Hide FFmpeg banner
-      '-loglevel',
-      env.get('FFMPEG_LOG_LEVEL', 'warning'), // Log level set to warning
-      '-protocol_whitelist',
-      'file,crypto,data,udp,rtp',
-      '-fflags',
-      '+discardcorrupt+nobuffer', // Ignore corrupted frames and minimize buffering
+      '-y',
+      '-hide_banner',
+      '-loglevel', env.get('FFMPEG_LOG_LEVEL', 'warning'),
+      '-protocol_whitelist', 'file,crypto,data,udp,rtp',
+      '-fflags', '+discardcorrupt+nobuffer',
+      '-use_wallclock_as_timestamps', '1',
+      '-fflags', '+genpts',
 
-      // Hardware-accelerated decoding arguments
-      ...this.#hardwareAcceleratedDecodingArguments,
+      // Hardware-accelerated decoding
+      '-hwaccel', 'vaapi',
+      '-hwaccel_device', '/dev/dri/renderD128',
+      '-hwaccel_output_format', 'vaapi',
 
-      // SDP input
-      '-i',
-      `"${this.#streamerFFMpegInputSdp}"`, // SDP File input with quotes
+      '-i', `${this.#streamerFFMpegInputSdp}`,
 
-      // Hardware-accelerated encoding arguments (no conflict now)
-      ...this.#hardwareAcceleratedEncodingArguments,
+      // Hardware-accelerated encoding
+      '-c:v', 'h264_vaapi',
+      '-qp', '20',
+      '-g', '30',
+      '-vf', 'format=nv12,hwupload,scale_vaapi=w=1920:h=1080',
+      '-r', '10',
+      '-b:v', '100k',
+      '-bufsize', '100k',
+      '-max_delay', '500000',
 
-      '-tune',
-      'zerolatency', // Tune for low latency
-      '-x264opts',
-      'bframes=0', // No B-frames
-      '-preset',
-      'ultrafast', // Ultrafast preset
-      '-b:v',
-      '100k',
-      '-r',
-      '10', // Set frame rate dynamically
+      // Audio
+      '-c:a:0', 'aac',
+      '-b:a:0', '128k',
+      '-c:a:1', 'libopus',
+      '-b:a:1', '128k',
 
-      // Set the size and pixel format
-      '-s',
-      '1920x1080', // Set video size
-      '-pix_fmt',
-      'yuv420p',
+      // Mapping
+      '-map', '0:v',
+      '-map', '0:a',
+      '-map', '0:a',
 
-      // Set buffer size and limit delay
-      '-bufsize',
-      `100k`, // Set buffer size equal to the bitrate for low latency
-      '-max_delay',
-      '1000000', // Max delay of 1000ms
+      // Muxing
+      '-f', 'mpegts',
+      '-muxdelay', '0.2',
+      '-muxpreload', '0.1',
+      '-flush_packets', '1',
 
-      // AAC Audio Stream (track 1)
-      '-c:a:0',
-      'aac',
-      '-b:a:0',
-      '128k', // Audio bitrate for AAC
-
-      // Opus Audio Stream (track 2)
-      '-c:a:1',
-      'libopus',
-      '-b:a:1',
-      '128k', // Audio bitrate for Opus
-
-      // Mapping inputs and outputs
-      '-map',
-      '0:v', // Map the video input to the H.264 video stream
-      '-map',
-      '0:a', // Map the original AAC audio to the first audio track
-      '-map',
-      '0:a', // Map the original audio again for Opus encoding
-
-      // Muxing into MPEG-TS
-      '-f',
-      'mpegts',
-      '-muxdelay',
-      '0.2', // Set muxing delay
-      '-muxpreload',
-      '0.1', // Set mux preload
-
-      // Output to Unix socket
-      `unix:${this.#cameraPassthroughSock}`, // Unix socket output for the MPEG-TS stream
-
-      // Optional: Limit the number of threads for real-time processing
-      '-threads',
-      '1',
-    ]
+      `unix:${this.#cameraPassthroughSock}`,
+      '-threads', '2',
+    ];
 
     this.#cameraStreamer = execa(ffmpegBinary, ffmpegArgs, {
       stdio: 'pipe',
