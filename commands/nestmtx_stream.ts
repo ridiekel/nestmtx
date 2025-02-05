@@ -636,7 +636,6 @@ export default class NestmtxStream extends BaseCommand {
       '-loglevel', env.get('FFMPEG_DEBUG_LEVEL', 'warning'),
       '-fflags', '+discardcorrupt+nobuffer+genpts',
       '-rtsp_transport', 'udp',
-      '-stimeout', '5000000',
 
       ...this.#hardwareAcceleratedDecodingArguments,
 
