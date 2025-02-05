@@ -384,6 +384,8 @@ export default class NestmtxStream extends BaseCommand {
       `"${this.#destination}"`, // Destination path
     ];
 
+    this.#outputStreamLogger.info(ffmpegArgs)
+
     this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
       stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
       reject: false,
