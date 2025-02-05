@@ -639,13 +639,16 @@ export default class NestmtxStream extends BaseCommand {
 
       ...this.#hardwareAcceleratedDecodingArguments,
 
+      '-init_hw_device', 'vaapi=vaapi:/dev/dri/renderD128',
+      '-filter_hw_device', 'vaapi',
+
       '-i', `"${rtspSrc}"`,
 
       '-analyzeduration', '0',
       '-probesize', '32',
 
       ...this.#hardwareAcceleratedEncodingArguments,
-      '-vf', 'format=nv12,hwupload,scale_vaapi=w=1280:h=720',
+      '-vf', 'format=nv12,hwupload=derive_device=vaapi,scale_vaapi=w=1280:h=720,format=vaapi',
       '-c:v', 'h264_vaapi',
       '-qp', '20',
       '-profile:v', 'high',
