@@ -316,7 +316,7 @@ export default class NestmtxStream extends BaseCommand {
 
   #startOutputStreamer() {
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg');
-    const disableTranscoding = env.get('FFMPEG_DISABLE_TRANSCODING', 'false') === 'true';
+    const disableTranscoding = env.get('FFMPEG_DISABLE_TRANSCODING', 'false') === true;
 
     this.#outputStreamLogger.info("Disable transcoding: " + disableTranscoding)
 
@@ -471,7 +471,7 @@ export default class NestmtxStream extends BaseCommand {
 
   #streamJpegToOutputStream(src: string, size: string = '640x480', signal?: AbortSignal) {
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
-    const disableTranscoding = env.get('FFMPEG_DISABLE_TRANSCODING', 'false') === 'true';
+    const disableTranscoding = env.get('FFMPEG_DISABLE_TRANSCODING', 'false') === true;
 
     const ffmpegArgs = [
       '-loglevel',
@@ -648,7 +648,7 @@ export default class NestmtxStream extends BaseCommand {
     const videoSizeArguments =
       characteristics.video.width && characteristics.video.height ? ['-s', size] : []
 
-    const disableTranscoding = env.get('FFMPEG_DISABLE_TRANSCODING', 'false') === 'true';
+    const disableTranscoding = env.get('FFMPEG_DISABLE_TRANSCODING', 'false') === true;
 
     const ffmpegArgs = [
       '-loglevel',
@@ -1002,7 +1002,7 @@ a=rtcp:${audioRTCPPort}
     await writeFile(this.#streamerFFMpegInputSdp, sdp)
     this.#connectingStreamAbortController.abort()
     this.#cameraStreamLogger.info(`Starting FFMpeg with WebRTC stream`)
-    const disableTranscoding = env.get('FFMPEG_DISABLE_TRANSCODING', 'false') === 'true';
+    const disableTranscoding = env.get('FFMPEG_DISABLE_TRANSCODING', 'false') === true;
 
     const ffmpegArgs = [
       '-y', // Overwrite output files
