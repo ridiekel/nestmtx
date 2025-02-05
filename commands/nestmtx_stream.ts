@@ -1023,7 +1023,7 @@ a=rtcp:${audioRTCPPort}
             '-r', '10', // Set frame rate
 
             // Set the size and pixel format
-            '-s', '1920x1080', // Set video size
+            // '-s', '1920x1080', // Set video size
             // '-pix_fmt', 'vaapi', // Set pixel format
 
             // Set buffer size and limit delay
