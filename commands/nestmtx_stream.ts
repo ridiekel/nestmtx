@@ -342,7 +342,7 @@ export default class NestmtxStream extends BaseCommand {
             '-preset', 'ultrafast',   // Use ultrafast preset for faster encoding
             '-b:v', '100k',           // Set video bitrate
             '-r', '10',               // Set frame rate
-            '-vf', 'format=yuv420p',
+            '-vf', 'format=nv12,hwupload',
             '-pix_fmt', 'yuv420p',    // Set pixel format
           ]
           : [
