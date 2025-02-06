@@ -30,10 +30,7 @@ import type { Socket as DGramSocket } from 'node:dgram'
 import type { Server as UnixSocketServer, Socket as UnixSocket } from 'node:net'
 import type winston from 'winston'
 
-
 export default class NestmtxStream extends BaseCommand {
-  disableTranscoding = env.get('FFMPEG_DISABLE_TRANSCODING', false);
-
   static commandName = 'nestmtx:stream'
   static description = 'Start a stream to the MediaMTX server'
 
@@ -318,87 +315,62 @@ export default class NestmtxStream extends BaseCommand {
   }
 
   #startOutputStreamer() {
-    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
+    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg');
+    const disableTranscoding = env.get('FFMPEG_DISABLE_TRANSCODING', 'false') === 'true';
+
     const ffmpegArgs = [
       '-loglevel',
       env.get('FFMPEG_DEBUG_LEVEL', 'warning'),
       '-fflags',
       '+discardcorrupt', // Ignore corrupted frames
 
-      ...(this.disableTranscoding
-          ? []
-          : this.#hardwareAcceleratedDecodingArguments
-      ),
-
-      '-stimeout', '5000000', // 5 seconden timeout op RTSP connecties
-      '-rtsp_transport', 'tcp', // Forceer TCP als UDP mogelijk faalt
-      '-reorder_queue_size', '50', // Zorg voor extra buffering
-      '-stream_loop', '-1',
+      // Hardware-accelerated decoding arguments (only if transcoding is enabled)
+      ...(!disableTranscoding ? this.#hardwareAcceleratedDecodingArguments : []),
 
       // Input from pipe:3
       '-i',
       `pipe:3`,
-    ];
 
-    if (this.disableTranscoding) {
-      // No transcoding: copy streams directly
-      ffmpegArgs.push(
-        '-c', 'copy',
+      // Transcoding settings
+      ...(!disableTranscoding
+          ? [
+            ...this.#hardwareAcceleratedEncodingArguments,
+            '-tune', 'zerolatency', // Optimize for low latency
+            '-x264opts', 'bframes=0', // Disable B-frames
+            '-preset', 'ultrafast',   // Use ultrafast preset for faster encoding
+            '-b:v', '100k',           // Set video bitrate
+            '-r', '10',               // Set frame rate
+            '-pix_fmt', 'yuv420p',    // Set pixel format
+          ]
+          : [
+            '-c:v', 'copy',  // Copy video stream without transcoding
+            '-c:a', 'copy',  // Copy audio stream without transcoding
+          ]
+      ),
 
-        // Explicit Mapping of Video and Audio Streams
-        // Mapping van video- en audiostreams
-        '-map',
-        '0:v:0', // Eerste videotrack
-        '-map',
-        '0:a:0?', // Eerste audiotrack (optioneel met '?')
-        '-map',
-        '0:a:1?', // Tweede audiotrack (optioneel)
+      // Audio streams (only applicable if transcoding is enabled)
+      ...(!disableTranscoding
+          ? [
+            '-c:a:0', 'aac',
+            '-b:a:0', '128k', // Set AAC audio bitrate
+            '-c:a:1', 'libopus',
+            '-b:a:1', '128k', // Set Opus audio bitrate
+          ]
+          : []
+      ),
 
-        '-re',
+      // Explicit mapping of video and audio streams
+      '-map', '0:v:0', // Map the first video track (H.264)
+      '-map', '0:a:0', // Map the first audio track (AAC)
+      '-map', '0:a:1', // Map the second audio track (Opus)
 
-        // Output Format
-        '-f', 'mpegts',
-        '-use_wallclock_as_timestamps', '1',
+      // Output format
+      '-f', 'mpegts', // Set the output format to MPEG-TS
+      '-use_wallclock_as_timestamps', '1', // Use wallclock as timestamps
 
-        '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
-
-        // Destination
-        this.#destination
-      );
-    } else {
-      // Hardware-accelerated encoding arguments
-      ffmpegArgs.push(
-        ...this.#hardwareAcceleratedEncodingArguments,
-
-        // Video options
-        '-tune', 'zerolatency', // Tune for low latency
-        '-x264opts', 'bframes=0', // No B-frames
-        '-preset', 'ultrafast', // Ultrafast preset
-        '-b:v', '100k', // Set video bitrate dynamically
-        '-r', '10', // Set frame rate dynamically
-        '-pix_fmt', 'yuv420p', // Set pixel format
-
-        // AAC Audio Stream (track 1)
-        '-c:a:0', 'aac',
-        '-b:a:0', '128k', // Audio bitrate for AAC
-
-        // Opus Audio Stream (track 2)
-        '-c:a:1', 'libopus',
-        '-b:a:1', '128k', // Audio bitrate for Opus
-
-        // Explicit Mapping of Video and Audio Streams
-        '-map', '0:v:0', // Map the first video track
-        '-map', '0:a:0', // Map the first audio track
-        '-map', '0:a:1', // Map the second audio track
-
-        // Output Format
-        '-f', 'mpegts',
-        '-use_wallclock_as_timestamps', '1',
-
-        // Destination
-        this.#destination
-      );
-    }
+      // Destination (SRT or other media server)
+      `${this.#destination}`, // Destination path
+    ]
 
     this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
       stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
@@ -483,60 +455,66 @@ export default class NestmtxStream extends BaseCommand {
 
   #streamJpegToOutputStream(src: string, size: string = '640x480', signal?: AbortSignal) {
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
+    const disableTranscoding = env.get('FFMPEG_DISABLE_TRANSCODING', 'false') === 'true';
+
     const ffmpegArgs = [
       '-loglevel',
-      env.get('FFMPEG_DEBUG_LEVEL', 'warning'),
+      env.get('FFMPEG_DEBUG_LEVEL', 'warning'), // Set the logging level based on environment variable
+
       '-loop',
-      '1',
-      // Hardware-accelerated decoding arguments
-      ...this.#hardwareAcceleratedDecodingArguments,
+      '1', // Loop the input image continuously
+
+      // Hardware-accelerated decoding arguments (only if transcoding is enabled)
+      ...(!disableTranscoding ? this.#hardwareAcceleratedDecodingArguments : []),
+
       '-i',
-      `${src}`,
+      `${src}`, // Input source (image file)
+
       '-f',
       'lavfi',
       '-i',
-      'anullsrc=r=48000:cl=stereo', // Synthetic audio source
-      // Hardware-accelerated encoding arguments (no conflict now)
-      ...this.#hardwareAcceleratedEncodingArguments,
-      '-profile:v',
-      'main',
-      '-tune',
-      'zerolatency',
-      '-r',
-      '25',
-      '-s',
-      size,
-      '-pix_fmt',
-      'yuv420p',
+      'anullsrc=r=48000:cl=stereo', // Synthetic audio source with 48kHz sample rate and stereo channels
 
-      // AAC Audio Stream (track 1)
-      '-c:a:0',
-      'aac',
-      '-b:a:0',
-      '128k', // Audio bitrate for AAC
+      // Hardware-accelerated encoding arguments (only if transcoding is enabled)
+      ...(!disableTranscoding ? this.#hardwareAcceleratedEncodingArguments : []),
 
-      // Opus Audio Stream (track 2)
-      '-c:a:1',
-      'libopus',
-      '-b:a:1',
-      '128k', // Audio bitrate for Opus
+      // Transcoding settings
+      ...(!disableTranscoding
+          ? [
+            '-profile:v', 'main', // Set the H.264 profile to 'main'
+            '-tune', 'zerolatency', // Optimize for low latency
+            '-r', '25', // Set frame rate to 25 FPS
+            '-s', size, // Set the video resolution dynamically
+            '-pix_fmt', 'yuv420p', // Set pixel format for broad compatibility
+
+            // AAC Audio Stream (track 1)
+            '-c:a:0', 'aac', // Use AAC codec for the first audio stream
+            '-b:a:0', '128k', // Set AAC audio bitrate to 128 kbps
+
+            // Opus Audio Stream (track 2)
+            '-c:a:1', 'libopus', // Use Opus codec for the second audio stream
+            '-b:a:1', '128k', // Set Opus audio bitrate to 128 kbps
+          ]
+          : [
+            '-c:v', 'copy', // Copy video stream without transcoding
+            '-c:a', 'copy', // Copy audio stream without transcoding
+          ]
+      ),
 
       // Mapping inputs and outputs
-      '-map',
-      '0:v', // Map the video input to the H.264 video stream (image source)
-      '-map',
-      '1:a', // Map the synthetic audio source to the AAC stream
-      '-map',
-      '1:a', // Map the synthetic audio source again for Opus encoding
+      '-map', '0:v', // Map the video input (image source) to the H.264 video stream
+      '-map', '1:a', // Map the synthetic audio source to the AAC stream
+      '-map', '1:a', // Map the synthetic audio source again for Opus encoding
 
       '-f',
-      'mpegts',
+      'mpegts', // Set the output format to MPEG-TS
       '-listen',
-      '0',
+      '0', // Disable listen mode (output acts as a client)
       '-use_wallclock_as_timestamps',
-      '1',
-      `unix:${this.#streamerPassthroughSock}`, // Send output to Unix socket
-    ]
+      '1', // Use wallclock timestamps for synchronization
+
+      `unix:${this.#streamerPassthroughSock}`, // Send the output to a Unix socket
+    ];
 
     this.#staticStreamer = execa(ffmpegBinary, ffmpegArgs, {
       stdio: 'pipe',
@@ -654,83 +632,74 @@ export default class NestmtxStream extends BaseCommand {
     const videoSizeArguments =
       characteristics.video.width && characteristics.video.height ? ['-s', size] : []
 
+    const disableTranscoding = env.get('FFMPEG_DISABLE_TRANSCODING', 'false') === 'true';
+
     const ffmpegArgs = [
       '-loglevel',
-      env.get('FFMPEG_DEBUG_LEVEL', 'warning'), // Suppress most log messages, only show warnings
+      env.get('FFMPEG_DEBUG_LEVEL', 'warning'), // Set the logging level based on environment variable
+
       '-fflags',
       '+discardcorrupt+nobuffer', // Ignore corrupted frames and minimize buffering
 
-      ...(this.disableTranscoding
-          ? []
-          : this.#hardwareAcceleratedDecodingArguments
-      ),
+      // Hardware-accelerated decoding arguments (only if transcoding is enabled)
+      ...(!disableTranscoding ? this.#hardwareAcceleratedDecodingArguments : []),
 
       '-i',
-      `${rtspSrc}`, // Input RTSP stream
+      `"${rtspSrc}"`, // Input RTSP stream with quotes
 
       // Retry options for network issues
       '-rtsp_transport',
       'udp', // Use UDP to reduce latency
+
+      // Hardware-accelerated encoding arguments (only if transcoding is enabled)
+      ...(!disableTranscoding ? this.#hardwareAcceleratedEncodingArguments : []),
+
+      // Transcoding settings
+      ...(!disableTranscoding
+          ? [
+            '-tune', 'zerolatency', // Optimize for low latency
+            '-x264opts', 'bframes=0', // Disable B-frames
+            '-preset', 'ultrafast', // Use ultrafast preset for faster encoding
+            '-b:v', `${videoBitrate}k`, // Set video bitrate dynamically
+            ...videoSizeArguments, // Set video size dynamically
+
+            // Set buffer size and limit delay
+            '-bufsize', `${videoBitrate}k`, // Buffer size equal to bitrate
+            '-max_delay', '1000000', // Max delay of 1000ms
+
+            // Set pixel format
+            '-pix_fmt', 'yuv420p',
+
+            // AAC Audio Stream
+            '-c:a:0', 'aac', // Use AAC codec for the first audio stream
+            '-b:a:0', '128k', // Set AAC audio bitrate
+
+            // Opus Audio Stream
+            '-c:a:1', 'libopus', // Use Opus codec for the second audio stream
+            '-b:a:1', '128k', // Set Opus audio bitrate
+          ]
+          : [
+            '-c:v', 'copy', // Copy video stream without transcoding
+            '-c:a', 'copy', // Copy audio stream without transcoding
+          ]
+      ),
+
+      // Mapping inputs and outputs
+      '-map', '0:v', // Map the video input to the H.264 video stream
+      '-map', '0:a', // Map the original AAC audio to the first audio track
+      '-map', '0:a', // Map the original audio again for Opus encoding
+
+      '-f',
+      'mpegts', // Set the output format to MPEG-TS
+      '-listen',
+      '0', // Disable listen mode (output acts as a client)
+
+      `unix:${this.#cameraPassthroughSock}`, // Send output to Unix socket
+
+      // Optional: Limit the number of threads for real-time processing
+      '-threads',
+      '1', // Limit to a single thread for real-time performance
     ];
-
-    if (this.disableTranscoding) {
-      // No transcoding: copy streams directly
-      ffmpegArgs.push(
-        '-c', 'copy',
-
-        // Mapping inputs and outputs
-        '-map', '0:v', // Map the video input
-        '-map', '0:a', // Map the original AAC audio
-        '-map', '0:a', // Map the original audio again
-
-        '-f', 'mpegts',
-        '-listen', '0',
-        `unix:${this.#cameraPassthroughSock}`, // Send output to Unix socket
-
-        // Optional: Limit the number of threads for real-time processing
-        '-threads', '1'
-      );
-    } else {
-      // Hardware-accelerated encoding arguments
-      ffmpegArgs.push(
-        ...this.#hardwareAcceleratedEncodingArguments,
-
-        // Single H.264 Video Stream (without B-frames)
-        '-tune', 'zerolatency', // Tune for low latency
-        '-x264opts', 'bframes=0', // No B-frames
-        '-preset', 'ultrafast', // Ultrafast preset
-        `-b:v`, `${videoBitrate}k`, // Set video bitrate dynamically
-        ...videoSizeArguments,
-
-        // Set buffer size and limit delay
-        '-bufsize', `${videoBitrate}k`, // Set buffer size equal to the bitrate for low latency
-        '-max_delay', '1000000', // Max delay of 1000ms
-
-        // Set pixel format to avoid deprecated warning
-        '-pix_fmt', 'yuv420p',
-
-        // AAC Audio Stream
-        '-c:a:0', 'aac',
-        '-b:a:0', '128k', // Audio bitrate for AAC
-
-        // Opus Audio Stream
-        '-c:a:1', 'libopus',
-        '-b:a:1', '128k', // Audio bitrate for Opus
-
-        // Mapping inputs and outputs
-        '-map', '0:v', // Map the video input to the H.264 video stream
-        '-map', '0:a', // Map the original AAC audio to the first audio track
-        '-map', '0:a', // Map the original audio again for Opus encoding
-
-        '-f', 'mpegts',
-        '-listen', '0',
-        `unix:${this.#cameraPassthroughSock}`, // Send output to Unix socket
-
-        // Optional: Limit the number of threads for real-time processing
-        '-threads', '1'
-      );
-    }
-
     this.#connectingStreamAbortController.abort()
     this.#cameraStreamLogger.info(`Starting FFMpeg with RTSP stream`)
     this.#cameraStreamer = execa(ffmpegBinary, ffmpegArgs, {
@@ -1017,6 +986,8 @@ a=rtcp:${audioRTCPPort}
     await writeFile(this.#streamerFFMpegInputSdp, sdp)
     this.#connectingStreamAbortController.abort()
     this.#cameraStreamLogger.info(`Starting FFMpeg with WebRTC stream`)
+    const disableTranscoding = env.get('FFMPEG_DISABLE_TRANSCODING', 'false') === 'true';
+
     const ffmpegArgs = [
       '-y', // Overwrite output files
       '-hide_banner', // Hide FFmpeg banner
@@ -1027,82 +998,64 @@ a=rtcp:${audioRTCPPort}
       '-fflags',
       '+discardcorrupt+nobuffer', // Ignore corrupted frames and minimize buffering
 
-      // Hardware-accelerated decoding arguments
-      ...(this.disableTranscoding
-          ? []
-          : this.#hardwareAcceleratedDecodingArguments
-      ),
+      // Hardware-accelerated decoding arguments (only if transcoding is enabled)
+      ...(!disableTranscoding ? this.#hardwareAcceleratedDecodingArguments : []),
 
       // SDP input
       '-i',
       `${this.#streamerFFMpegInputSdp}`, // SDP File input
+
+      // Hardware-accelerated encoding arguments (only if transcoding is enabled)
+      ...(!disableTranscoding ? this.#hardwareAcceleratedEncodingArguments : []),
+
+      // Transcoding settings
+      ...(!disableTranscoding
+          ? [
+            '-tune', 'zerolatency', // Optimize for low latency
+            '-x264opts', 'bframes=0', // Disable B-frames
+            '-preset', 'ultrafast', // Use ultrafast preset for faster encoding
+            '-b:v', '100k', // Set video bitrate
+            '-r', '10', // Set frame rate
+
+            // Set the size and pixel format
+            '-s', '1920x1080', // Set video size
+            '-pix_fmt', 'yuv420p', // Set pixel format
+
+            // Set buffer size and limit delay
+            '-bufsize', '100k', // Buffer size equal to bitrate
+            '-max_delay', '1000000', // Max delay of 1000ms
+
+            // AAC Audio Stream
+            '-c:a:0', 'aac', // Use AAC codec for the first audio stream
+            '-b:a:0', '128k', // Set AAC audio bitrate
+
+            // Opus Audio Stream
+            '-c:a:1', 'libopus', // Use Opus codec for the second audio stream
+            '-b:a:1', '128k', // Set Opus audio bitrate
+          ]
+          : [
+            '-c:v', 'copy', // Copy video stream without transcoding
+            '-c:a', 'copy', // Copy audio stream without transcoding
+          ]
+      ),
+
+      // Mapping inputs and outputs
+      '-map', '0:v', // Map the video input to the H.264 video stream
+      '-map', '0:a', // Map the original AAC audio to the first audio track
+      '-map', '0:a', // Map the original audio again for Opus encoding
+
+      // Muxing into MPEG-TS
+      '-f', 'mpegts', // Set the output format to MPEG-TS
+      '-muxdelay', '0.2', // Set muxing delay
+      '-muxpreload', '0.1', // Set mux preload
+
+      // Output to Unix socket
+      `unix:${this.#cameraPassthroughSock}`, // Unix socket output for the MPEG-TS stream
+
+      // Optional: Limit the number of threads for real-time processing
+      '-threads',
+      '1', // Limit to a single thread for real-time performance
     ];
-
-    if (this.disableTranscoding) {
-      // No transcoding: copy streams directly
-      ffmpegArgs.push(
-        '-c', 'copy',
-
-        // Mapping inputs and outputs
-        '-map', '0:v', // Map the video input
-        '-map', '0:a', // Map the original AAC audio
-        '-map', '0:a', // Map the original audio again
-
-        // Muxing into MPEG-TS
-        '-f', 'mpegts',
-        '-muxdelay', '0.2', // Set muxing delay
-        '-muxpreload', '0.1', // Set mux preload
-
-        // Output to Unix socket
-        `unix:${this.#cameraPassthroughSock}`, // Unix socket output for the MPEG-TS stream
-
-        // Optional: Limit the number of threads for real-time processing
-        '-threads', '1'
-      );
-    } else {
-      // Hardware-accelerated encoding arguments
-      ffmpegArgs.push(
-        ...this.#hardwareAcceleratedEncodingArguments,
-
-        '-tune', 'zerolatency', // Tune for low latency
-        '-x264opts', 'bframes=0', // No B-frames
-        '-preset', 'ultrafast', // Ultrafast preset
-        '-b:v', '100k',
-        '-r', '10', // Set frame rate dynamically
-
-        // Set the size and pixel format
-        '-s', '1920x1080', // Set video size
-        '-pix_fmt', 'yuv420p',
-
-        // Set buffer size and limit delay
-        '-bufsize', '100k', // Set buffer size equal to the bitrate for low latency
-        '-max_delay', '1000000', // Max delay of 1000ms
-
-        // AAC Audio Stream (track 1)
-        '-c:a:0', 'aac',
-        '-b:a:0', '128k', // Audio bitrate for AAC
-
-        // Opus Audio Stream (track 2)
-        '-c:a:1', 'libopus',
-        '-b:a:1', '128k', // Audio bitrate for Opus
-
-        // Mapping inputs and outputs
-        '-map', '0:v', // Map the video input to the H.264 video stream
-        '-map', '0:a', // Map the original AAC audio to the first audio track
-        '-map', '0:a', // Map the original audio again for Opus encoding
-
-        // Muxing into MPEG-TS
-        '-f', 'mpegts',
-        '-muxdelay', '0.2', // Set muxing delay
-        '-muxpreload', '0.1', // Set mux preload
-
-        // Output to Unix socket
-        `unix:${this.#cameraPassthroughSock}`, // Unix socket output for the MPEG-TS stream
-
-        // Optional: Limit the number of threads for real-time processing
-        '-threads', '1'
-      );
-    }
 
     this.#cameraStreamer = execa(ffmpegBinary, ffmpegArgs, {
       stdio: 'pipe',
