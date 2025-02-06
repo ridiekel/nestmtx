@@ -339,13 +339,11 @@ export default class NestmtxStream extends BaseCommand {
         '-c', 'copy',
 
         // Explicit Mapping of Video and Audio Streams
-        '-map', '0:v:0', // Map the first video track
-        '-map', '0:a:0', // Map the first audio track
-        '-map', '0:a:1', // Map the second audio track
+        '-map', '0', // Map the first video track
 
         // Output Format
         '-f', 'mpegts',
-        '-use_wallclock_as_timestamps', '1',
+        // '-use_wallclock_as_timestamps', '1',
 
         // Destination
         this.#destination
