@@ -325,8 +325,10 @@ export default class NestmtxStream extends BaseCommand {
       '-fflags',
       '+discardcorrupt', // Ignore corrupted frames
 
-      // Hardware-accelerated decoding arguments
-      ...this.#hardwareAcceleratedDecodingArguments,
+      ...(this.disableTranscoding
+          ? []
+          : this.#hardwareAcceleratedDecodingArguments
+      ),
 
       // Input from pipe:3
       '-i',
