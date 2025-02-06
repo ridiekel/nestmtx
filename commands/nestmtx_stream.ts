@@ -341,7 +341,13 @@ export default class NestmtxStream extends BaseCommand {
         '-c', 'copy',
 
         // Explicit Mapping of Video and Audio Streams
-        '-map', '0', // Map the first video track
+        // Mapping van video- en audiostreams
+        '-map',
+        '0:v:0', // Eerste videotrack
+        '-map',
+        '0:a:0?', // Eerste audiotrack (optioneel met '?')
+        '-map',
+        '0:a:1?', // Tweede audiotrack (optioneel)
 
         '-re',
 
@@ -649,8 +655,10 @@ export default class NestmtxStream extends BaseCommand {
       '-fflags',
       '+discardcorrupt+nobuffer', // Ignore corrupted frames and minimize buffering
 
-      // Hardware-accelerated decoding arguments
-      ...this.#hardwareAcceleratedDecodingArguments,
+      ...(this.disableTranscoding
+          ? []
+          : this.#hardwareAcceleratedDecodingArguments
+      ),
 
       '-i',
       `${rtspSrc}`, // Input RTSP stream
@@ -1015,7 +1023,10 @@ a=rtcp:${audioRTCPPort}
       '+discardcorrupt+nobuffer', // Ignore corrupted frames and minimize buffering
 
       // Hardware-accelerated decoding arguments
-      ...this.#hardwareAcceleratedDecodingArguments,
+      ...(this.disableTranscoding
+          ? []
+          : this.#hardwareAcceleratedDecodingArguments
+      ),
 
       // SDP input
       '-i',
