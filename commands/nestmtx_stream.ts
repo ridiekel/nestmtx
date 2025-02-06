@@ -30,7 +30,10 @@ import type { Socket as DGramSocket } from 'node:dgram'
 import type { Server as UnixSocketServer, Socket as UnixSocket } from 'node:net'
 import type winston from 'winston'
 
+
 export default class NestmtxStream extends BaseCommand {
+  disableTranscoding = env.get('FFMPEG_DISABLE_TRANSCODING', false);
+
   static commandName = 'nestmtx:stream'
   static description = 'Start a stream to the MediaMTX server'
 
@@ -328,55 +331,59 @@ export default class NestmtxStream extends BaseCommand {
       // Input from pipe:3
       '-i',
       `pipe:3`,
+    ];
 
-      // Hardware-accelerated encoding arguments (no conflict now)
-      ...this.#hardwareAcceleratedEncodingArguments,
+    if (this.disableTranscoding) {
+      // No transcoding: copy streams directly
+      ffmpegArgs.push(
+        '-c', 'copy',
 
-      // Other video options such as tune, bitrate, etc.
-      '-tune',
-      'zerolatency', // Tune for low latency
-      '-x264opts',
-      'bframes=0', // No B-frames
-      '-preset',
-      'ultrafast', // Ultrafast preset
-      '-b:v',
-      '100k', // Set video bitrate dynamically
-      '-r',
-      '10', // Set frame rate dynamically
+        // Explicit Mapping of Video and Audio Streams
+        '-map', '0:v:0', // Map the first video track
+        '-map', '0:a:0', // Map the first audio track
+        '-map', '0:a:1', // Map the second audio track
 
-      // Set pixel format to avoid deprecated warning
-      '-pix_fmt',
-      'yuv420p',
+        // Output Format
+        '-f', 'mpegts',
+        '-use_wallclock_as_timestamps', '1',
 
-      // AAC Audio Stream (track 1)
-      '-c:a:0',
-      'aac',
-      '-b:a:0',
-      '128k', // Audio bitrate for AAC
+        // Destination
+        this.#destination
+      );
+    } else {
+      // Hardware-accelerated encoding arguments
+      ffmpegArgs.push(
+        ...this.#hardwareAcceleratedEncodingArguments,
 
-      // Opus Audio Stream (track 2)
-      '-c:a:1',
-      'libopus',
-      '-b:a:1',
-      '128k', // Audio bitrate for Opus
+        // Video options
+        '-tune', 'zerolatency', // Tune for low latency
+        '-x264opts', 'bframes=0', // No B-frames
+        '-preset', 'ultrafast', // Ultrafast preset
+        '-b:v', '100k', // Set video bitrate dynamically
+        '-r', '10', // Set frame rate dynamically
+        '-pix_fmt', 'yuv420p', // Set pixel format
 
-      // Explicit Mapping of Video and Audio Streams
-      '-map',
-      '0:v:0', // Map the first video track (H.264)
-      '-map',
-      '0:a:0', // Map the first audio track (AAC)
-      '-map',
-      '0:a:1', // Map the second audio track (Opus)
+        // AAC Audio Stream (track 1)
+        '-c:a:0', 'aac',
+        '-b:a:0', '128k', // Audio bitrate for AAC
 
-      // Output Format
-      '-f',
-      'mpegts', // Set the format to MPEG-TS
-      '-use_wallclock_as_timestamps',
-      '1',
+        // Opus Audio Stream (track 2)
+        '-c:a:1', 'libopus',
+        '-b:a:1', '128k', // Audio bitrate for Opus
 
-      // Destination (SRT or other media server)
-      `"${this.#destination}"`, // Destination path (quoted)
-    ]
+        // Explicit Mapping of Video and Audio Streams
+        '-map', '0:v:0', // Map the first video track
+        '-map', '0:a:0', // Map the first audio track
+        '-map', '0:a:1', // Map the second audio track
+
+        // Output Format
+        '-f', 'mpegts',
+        '-use_wallclock_as_timestamps', '1',
+
+        // Destination
+        this.#destination
+      );
+    }
 
     this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
       stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
@@ -632,7 +639,7 @@ export default class NestmtxStream extends BaseCommand {
     const videoSizeArguments =
       characteristics.video.width && characteristics.video.height ? ['-s', size] : []
 
-    const ffmpegArgs: string[] = [
+    const ffmpegArgs = [
       '-loglevel',
       env.get('FFMPEG_DEBUG_LEVEL', 'warning'), // Suppress most log messages, only show warnings
       '-fflags',
@@ -642,66 +649,70 @@ export default class NestmtxStream extends BaseCommand {
       ...this.#hardwareAcceleratedDecodingArguments,
 
       '-i',
-      `"${rtspSrc}"`, // Input RTSP stream with quotes
+      `${rtspSrc}`, // Input RTSP stream
 
       // Retry options for network issues
       '-rtsp_transport',
       'udp', // Use UDP to reduce latency
+    ];
 
+    if (this.disableTranscoding) {
+      // No transcoding: copy streams directly
+      ffmpegArgs.push(
+        '-c', 'copy',
+
+        // Mapping inputs and outputs
+        '-map', '0:v', // Map the video input
+        '-map', '0:a', // Map the original AAC audio
+        '-map', '0:a', // Map the original audio again
+
+        '-f', 'mpegts',
+        '-listen', '0',
+        `unix:${this.#cameraPassthroughSock}`, // Send output to Unix socket
+
+        // Optional: Limit the number of threads for real-time processing
+        '-threads', '1'
+      );
+    } else {
       // Hardware-accelerated encoding arguments
-      ...this.#hardwareAcceleratedEncodingArguments,
+      ffmpegArgs.push(
+        ...this.#hardwareAcceleratedEncodingArguments,
 
-      // Single H.264 Video Stream (without B-frames)
-      '-tune',
-      'zerolatency', // Tune for low latency
-      '-x264opts',
-      'bframes=0', // No B-frames
-      '-preset',
-      'ultrafast', // Ultrafast preset
-      `-b:v`,
-      `${videoBitrate}k`, // Set video bitrate dynamically
-      ...videoSizeArguments,
+        // Single H.264 Video Stream (without B-frames)
+        '-tune', 'zerolatency', // Tune for low latency
+        '-x264opts', 'bframes=0', // No B-frames
+        '-preset', 'ultrafast', // Ultrafast preset
+        `-b:v`, `${videoBitrate}k`, // Set video bitrate dynamically
+        ...videoSizeArguments,
 
-      // Set buffer size and limit delay
-      '-bufsize',
-      `${videoBitrate}k`, // Set buffer size equal to the bitrate for low latency
-      '-max_delay',
-      '1000000', // Max delay of 1000ms
+        // Set buffer size and limit delay
+        '-bufsize', `${videoBitrate}k`, // Set buffer size equal to the bitrate for low latency
+        '-max_delay', '1000000', // Max delay of 1000ms
 
-      // Set pixel format to avoid deprecated warning
-      '-pix_fmt',
-      'yuv420p',
+        // Set pixel format to avoid deprecated warning
+        '-pix_fmt', 'yuv420p',
 
-      // AAC Audio Stream
-      '-c:a:0',
-      'aac',
-      '-b:a:0',
-      '128k', // Audio bitrate for AAC
+        // AAC Audio Stream
+        '-c:a:0', 'aac',
+        '-b:a:0', '128k', // Audio bitrate for AAC
 
-      // Opus Audio Stream
-      '-c:a:1',
-      'libopus',
-      '-b:a:1',
-      '128k', // Audio bitrate for Opus
+        // Opus Audio Stream
+        '-c:a:1', 'libopus',
+        '-b:a:1', '128k', // Audio bitrate for Opus
 
-      // Mapping inputs and outputs
-      '-map',
-      '0:v', // Map the video input to the H.264 video stream
-      '-map',
-      '0:a', // Map the original AAC audio to the first audio track
-      '-map',
-      '0:a', // Map the original audio again for Opus encoding
+        // Mapping inputs and outputs
+        '-map', '0:v', // Map the video input to the H.264 video stream
+        '-map', '0:a', // Map the original AAC audio to the first audio track
+        '-map', '0:a', // Map the original audio again for Opus encoding
 
-      '-f',
-      'mpegts',
-      '-listen',
-      '0',
-      `unix:${this.#cameraPassthroughSock}`, // Send output to Unix socket
+        '-f', 'mpegts',
+        '-listen', '0',
+        `unix:${this.#cameraPassthroughSock}`, // Send output to Unix socket
 
-      // Optional: Limit the number of threads for real-time processing
-      '-threads',
-      '1',
-    ]
+        // Optional: Limit the number of threads for real-time processing
+        '-threads', '1'
+      );
+    }
 
     this.#connectingStreamAbortController.abort()
     this.#cameraStreamLogger.info(`Starting FFMpeg with RTSP stream`)
@@ -989,7 +1000,7 @@ a=rtcp:${audioRTCPPort}
     await writeFile(this.#streamerFFMpegInputSdp, sdp)
     this.#connectingStreamAbortController.abort()
     this.#cameraStreamLogger.info(`Starting FFMpeg with WebRTC stream`)
-    const ffmpegArgs: string[] = [
+    const ffmpegArgs = [
       '-y', // Overwrite output files
       '-hide_banner', // Hide FFmpeg banner
       '-loglevel',
@@ -1004,69 +1015,74 @@ a=rtcp:${audioRTCPPort}
 
       // SDP input
       '-i',
-      `"${this.#streamerFFMpegInputSdp}"`, // SDP File input with quotes
+      `${this.#streamerFFMpegInputSdp}`, // SDP File input
+    ];
 
-      // Hardware-accelerated encoding arguments (no conflict now)
-      ...this.#hardwareAcceleratedEncodingArguments,
+    if (this.disableTranscoding) {
+      // No transcoding: copy streams directly
+      ffmpegArgs.push(
+        '-c', 'copy',
 
-      '-tune',
-      'zerolatency', // Tune for low latency
-      '-x264opts',
-      'bframes=0', // No B-frames
-      '-preset',
-      'ultrafast', // Ultrafast preset
-      '-b:v',
-      '100k',
-      '-r',
-      '10', // Set frame rate dynamically
+        // Mapping inputs and outputs
+        '-map', '0:v', // Map the video input
+        '-map', '0:a', // Map the original AAC audio
+        '-map', '0:a', // Map the original audio again
 
-      // Set the size and pixel format
-      '-s',
-      '1920x1080', // Set video size
-      '-pix_fmt',
-      'yuv420p',
+        // Muxing into MPEG-TS
+        '-f', 'mpegts',
+        '-muxdelay', '0.2', // Set muxing delay
+        '-muxpreload', '0.1', // Set mux preload
 
-      // Set buffer size and limit delay
-      '-bufsize',
-      `100k`, // Set buffer size equal to the bitrate for low latency
-      '-max_delay',
-      '1000000', // Max delay of 1000ms
+        // Output to Unix socket
+        `unix:${this.#cameraPassthroughSock}`, // Unix socket output for the MPEG-TS stream
 
-      // AAC Audio Stream (track 1)
-      '-c:a:0',
-      'aac',
-      '-b:a:0',
-      '128k', // Audio bitrate for AAC
+        // Optional: Limit the number of threads for real-time processing
+        '-threads', '1'
+      );
+    } else {
+      // Hardware-accelerated encoding arguments
+      ffmpegArgs.push(
+        ...this.#hardwareAcceleratedEncodingArguments,
 
-      // Opus Audio Stream (track 2)
-      '-c:a:1',
-      'libopus',
-      '-b:a:1',
-      '128k', // Audio bitrate for Opus
+        '-tune', 'zerolatency', // Tune for low latency
+        '-x264opts', 'bframes=0', // No B-frames
+        '-preset', 'ultrafast', // Ultrafast preset
+        '-b:v', '100k',
+        '-r', '10', // Set frame rate dynamically
 
-      // Mapping inputs and outputs
-      '-map',
-      '0:v', // Map the video input to the H.264 video stream
-      '-map',
-      '0:a', // Map the original AAC audio to the first audio track
-      '-map',
-      '0:a', // Map the original audio again for Opus encoding
+        // Set the size and pixel format
+        '-s', '1920x1080', // Set video size
+        '-pix_fmt', 'yuv420p',
 
-      // Muxing into MPEG-TS
-      '-f',
-      'mpegts',
-      '-muxdelay',
-      '0.2', // Set muxing delay
-      '-muxpreload',
-      '0.1', // Set mux preload
+        // Set buffer size and limit delay
+        '-bufsize', '100k', // Set buffer size equal to the bitrate for low latency
+        '-max_delay', '1000000', // Max delay of 1000ms
 
-      // Output to Unix socket
-      `unix:${this.#cameraPassthroughSock}`, // Unix socket output for the MPEG-TS stream
+        // AAC Audio Stream (track 1)
+        '-c:a:0', 'aac',
+        '-b:a:0', '128k', // Audio bitrate for AAC
 
-      // Optional: Limit the number of threads for real-time processing
-      '-threads',
-      '1',
-    ]
+        // Opus Audio Stream (track 2)
+        '-c:a:1', 'libopus',
+        '-b:a:1', '128k', // Audio bitrate for Opus
+
+        // Mapping inputs and outputs
+        '-map', '0:v', // Map the video input to the H.264 video stream
+        '-map', '0:a', // Map the original AAC audio to the first audio track
+        '-map', '0:a', // Map the original audio again for Opus encoding
+
+        // Muxing into MPEG-TS
+        '-f', 'mpegts',
+        '-muxdelay', '0.2', // Set muxing delay
+        '-muxpreload', '0.1', // Set mux preload
+
+        // Output to Unix socket
+        `unix:${this.#cameraPassthroughSock}`, // Unix socket output for the MPEG-TS stream
+
+        // Optional: Limit the number of threads for real-time processing
+        '-threads', '1'
+      );
+    }
 
     this.#cameraStreamer = execa(ffmpegBinary, ffmpegArgs, {
       stdio: 'pipe',
