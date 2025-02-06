@@ -347,6 +347,8 @@ export default class NestmtxStream extends BaseCommand {
         '-f', 'mpegts',
         '-use_wallclock_as_timestamps', '1',
 
+        '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
+
         // Destination
         this.#destination
       );
