@@ -330,10 +330,10 @@ export default class NestmtxStream extends BaseCommand {
           : this.#hardwareAcceleratedDecodingArguments
       ),
 
-      '-stimeout', '5000000', // 5 seconden timeout op RTSP connecties
-      '-rtsp_transport', 'tcp', // Forceer TCP als UDP mogelijk faalt
-      '-reorder_queue_size', '50', // Zorg voor extra buffering
-      '-stream_loop', '-1',
+      // '-stimeout', '5000000', // 5 seconden timeout op RTSP connecties
+      // '-rtsp_transport', 'tcp', // Forceer TCP als UDP mogelijk faalt
+      // '-reorder_queue_size', '50', // Zorg voor extra buffering
+      // '-stream_loop', '-1',
 
       // Input from pipe:3
       '-i',
@@ -354,13 +354,13 @@ export default class NestmtxStream extends BaseCommand {
         '-map',
         '0:a:1?', // Tweede audiotrack (optioneel)
 
-        '-re',
+        // '-re',
 
         // Output Format
         '-f', 'mpegts',
         '-use_wallclock_as_timestamps', '1',
 
-        '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
+        // '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
 
         // Destination
         `"${this.#destination}"`, // Destination path
