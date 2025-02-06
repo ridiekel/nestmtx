@@ -633,48 +633,75 @@ export default class NestmtxStream extends BaseCommand {
       characteristics.video.width && characteristics.video.height ? ['-s', size] : []
 
     const ffmpegArgs: string[] = [
-      '-loglevel', env.get('FFMPEG_DEBUG_LEVEL', 'warning'),
-      '-fflags', '+discardcorrupt+nobuffer+genpts',
-      '-rtsp_transport', 'udp',
+      '-loglevel',
+      env.get('FFMPEG_DEBUG_LEVEL', 'warning'), // Suppress most log messages, only show warnings
+      '-fflags',
+      '+discardcorrupt+nobuffer', // Ignore corrupted frames and minimize buffering
 
+      // Hardware-accelerated decoding arguments
       ...this.#hardwareAcceleratedDecodingArguments,
 
-      '-init_hw_device', 'vaapi=vaapi:/dev/dri/renderD128',
-      '-filter_hw_device', 'vaapi',
+      '-i',
+      `"${rtspSrc}"`, // Input RTSP stream with quotes
 
-      '-i', `"${rtspSrc}"`,
+      // Retry options for network issues
+      '-rtsp_transport',
+      'udp', // Use UDP to reduce latency
 
-      '-analyzeduration', '0',
-      '-probesize', '32',
-
+      // Hardware-accelerated encoding arguments
       ...this.#hardwareAcceleratedEncodingArguments,
-      '-vf', 'format=nv12,hwupload=derive_device=vaapi,scale_vaapi=w=1280:h=720,format=vaapi',
-      '-c:v', 'h264_vaapi',
-      '-qp', '20',
-      '-profile:v', 'high',
-      '-level', '4.1',
-      '-b:v', `${videoBitrate}k`,
+
+      // Single H.264 Video Stream (without B-frames)
+      '-tune',
+      'zerolatency', // Tune for low latency
+      '-x264opts',
+      'bframes=0', // No B-frames
+      '-preset',
+      'ultrafast', // Ultrafast preset
+      `-b:v`,
+      `${videoBitrate}k`, // Set video bitrate dynamically
       ...videoSizeArguments,
 
-      '-bufsize', `${videoBitrate}k`,
-      '-max_delay', '1000000',
-      '-pix_fmt', 'vaapi',
+      // Set buffer size and limit delay
+      '-bufsize',
+      `${videoBitrate}k`, // Set buffer size equal to the bitrate for low latency
+      '-max_delay',
+      '1000000', // Max delay of 1000ms
 
-      '-c:a:0', 'aac', '-b:a:0', '128k',
-      '-c:a:1', 'libopus', '-b:a:1', '128k',
+      // Set pixel format to avoid deprecated warning
+      '-pix_fmt',
+      'yuv420p',
 
-      '-map', '0:v',
-      '-map', '0:a:0',
-      '-map', '0:a:0',
+      // AAC Audio Stream
+      '-c:a:0',
+      'aac',
+      '-b:a:0',
+      '128k', // Audio bitrate for AAC
 
-      '-f', 'mpegts',
-      '-listen', '0',
-      `unix:${this.#cameraPassthroughSock}`,
+      // Opus Audio Stream
+      '-c:a:1',
+      'libopus',
+      '-b:a:1',
+      '128k', // Audio bitrate for Opus
 
-      '-threads', '1',
-      '-thread_queue_size', '512',
-      '-avoid_negative_ts', 'make_zero'
-    ];
+      // Mapping inputs and outputs
+      '-map',
+      '0:v', // Map the video input to the H.264 video stream
+      '-map',
+      '0:a', // Map the original AAC audio to the first audio track
+      '-map',
+      '0:a', // Map the original audio again for Opus encoding
+
+      '-f',
+      'mpegts',
+      '-listen',
+      '0',
+      `unix:${this.#cameraPassthroughSock}`, // Send output to Unix socket
+
+      // Optional: Limit the number of threads for real-time processing
+      '-threads',
+      '1',
+    ]
 
     this.#connectingStreamAbortController.abort()
     this.#cameraStreamLogger.info(`Starting FFMpeg with RTSP stream`)
@@ -963,62 +990,83 @@ a=rtcp:${audioRTCPPort}
     this.#connectingStreamAbortController.abort()
     this.#cameraStreamLogger.info(`Starting FFMpeg with WebRTC stream`)
     const ffmpegArgs: string[] = [
-      '-y',
-      '-hide_banner',
-      '-loglevel', env.get('FFMPEG_LOG_LEVEL', 'debug'), // Switch to debug for more verbose logs
-      '-protocol_whitelist', 'file,crypto,data,udp,rtp',
-      '-fflags', '+discardcorrupt+nobuffer+genpts',
-      '-avoid_negative_ts', 'make_zero', // Prevent negative timestamps
-      '-use_wallclock_as_timestamps', '1',
+      '-y', // Overwrite output files
+      '-hide_banner', // Hide FFmpeg banner
+      '-loglevel',
+      env.get('FFMPEG_LOG_LEVEL', 'warning'), // Log level set to warning
+      '-protocol_whitelist',
+      'file,crypto,data,udp,rtp',
+      '-fflags',
+      '+discardcorrupt+nobuffer', // Ignore corrupted frames and minimize buffering
 
-      // Hardware-accelerated decoding
-      '-hwaccel', 'vaapi',
-      '-hwaccel_device', '/dev/dri/renderD128',
-      '-hwaccel_output_format', 'vaapi',
+      // Hardware-accelerated decoding arguments
+      ...this.#hardwareAcceleratedDecodingArguments,
 
-      // Input SDP
-      '-i', `${this.#streamerFFMpegInputSdp}`,
+      // SDP input
+      '-i',
+      `"${this.#streamerFFMpegInputSdp}"`, // SDP File input with quotes
 
-      // Hardware-accelerated encoding
-      '-c:v', 'h264_vaapi',
-      '-qp', '23',                // Adjust for better quality-control
-      '-g', '30',                 // GOP size for low latency
-      '-bf', '0',                 // Disable B-frames
-      '-r', '10',                 // Frame rate
-      '-vf', 'format=nv12,hwupload,scale_vaapi=w=1920:h=1080', // Explicit format conversion and scaling
-      '-pix_fmt', 'vaapi',
+      // Hardware-accelerated encoding arguments (no conflict now)
+      ...this.#hardwareAcceleratedEncodingArguments,
 
-      // Bitrate control
-      '-b:v', '200k',
-      '-minrate', '200k',
-      '-maxrate', '200k',
-      '-bufsize', '200k',
-      '-max_delay', '300000', // Reduce max delay for tighter real-time constraints
+      '-tune',
+      'zerolatency', // Tune for low latency
+      '-x264opts',
+      'bframes=0', // No B-frames
+      '-preset',
+      'ultrafast', // Ultrafast preset
+      '-b:v',
+      '100k',
+      '-r',
+      '10', // Set frame rate dynamically
 
-      // Audio settings
-      '-c:a:0', 'aac',
-      '-b:a:0', '128k',
-      '-c:a:1', 'libopus',
-      '-b:a:1', '128k',
-      '-async', '1', // Sync audio with video more tightly
+      // Set the size and pixel format
+      '-s',
+      '1920x1080', // Set video size
+      '-pix_fmt',
+      'yuv420p',
 
-      // Mapping inputs
-      '-map', '0:v',
-      '-map', '0:a',
-      '-map', '0:a',
+      // Set buffer size and limit delay
+      '-bufsize',
+      `100k`, // Set buffer size equal to the bitrate for low latency
+      '-max_delay',
+      '1000000', // Max delay of 1000ms
 
-      // Muxing settings
-      '-f', 'mpegts',
-      '-muxdelay', '0.1',         // Reduce muxing delay
-      '-muxpreload', '0.05',      // Reduce preload time
-      '-flush_packets', '1',      // Force immediate packet flushing
+      // AAC Audio Stream (track 1)
+      '-c:a:0',
+      'aac',
+      '-b:a:0',
+      '128k', // Audio bitrate for AAC
 
-      // Output
-      `unix:${this.#cameraPassthroughSock}`,
+      // Opus Audio Stream (track 2)
+      '-c:a:1',
+      'libopus',
+      '-b:a:1',
+      '128k', // Audio bitrate for Opus
 
-      // Thread management
-      '-threads', '1',
-    ];
+      // Mapping inputs and outputs
+      '-map',
+      '0:v', // Map the video input to the H.264 video stream
+      '-map',
+      '0:a', // Map the original AAC audio to the first audio track
+      '-map',
+      '0:a', // Map the original audio again for Opus encoding
+
+      // Muxing into MPEG-TS
+      '-f',
+      'mpegts',
+      '-muxdelay',
+      '0.2', // Set muxing delay
+      '-muxpreload',
+      '0.1', // Set mux preload
+
+      // Output to Unix socket
+      `unix:${this.#cameraPassthroughSock}`, // Unix socket output for the MPEG-TS stream
+
+      // Optional: Limit the number of threads for real-time processing
+      '-threads',
+      '1',
+    ]
 
     this.#cameraStreamer = execa(ffmpegBinary, ffmpegArgs, {
       stdio: 'pipe',
