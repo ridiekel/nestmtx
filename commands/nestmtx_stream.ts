@@ -330,6 +330,11 @@ export default class NestmtxStream extends BaseCommand {
           : this.#hardwareAcceleratedDecodingArguments
       ),
 
+      '-stimeout', '5000000', // 5 seconden timeout op RTSP connecties
+      '-rtsp_transport', 'tcp', // Forceer TCP als UDP mogelijk faalt
+      '-reorder_queue_size', '50', // Zorg voor extra buffering
+      '-stream_loop', '-1',
+
       // Input from pipe:3
       '-i',
       `pipe:3`,
