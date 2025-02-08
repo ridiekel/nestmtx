@@ -69,44 +69,44 @@ export default class HtopModule implements ApiServiceModule {
     return {}
   }
 
-  async #getCpuUsage() {
-    const cpus = os.cpus()
-    return cpus.map((cpu, index) => {
-      const total = Object.values(cpu.times).reduce((acc, time) => acc + time, 0)
-      return {
-        cpu: index + 1,
-        user: (cpu.times.user / total) * 100,
-        nice: (cpu.times.nice / total) * 100,
-        sys: (cpu.times.sys / total) * 100,
-        idle: (cpu.times.idle / total) * 100,
-        irq: (cpu.times.irq / total) * 100,
-      }
-    })
-  }
-
-  async #getMemoryUsage() {
-    const total = os.totalmem()
-    const free = os.freemem()
-    const used = total - free
-    return {
-      total,
-      used,
-    }
-  }
-
-  async #getProcessList() {
-    const pm3: PM3 = await this.#app.container.make('pm3')
-    const usage = await pidusage(process.pid)
-    const nestMtxProcess = {
-      name: 'nestmtx',
-      pid: process.pid,
-      cpu: usage.cpu,
-      memory: usage.memory,
-      uptime: usage.elapsed,
-    }
-    const children = await pm3.stats()
-    return [nestMtxProcess, ...children]
-  }
+  // async #getCpuUsage() {
+  //   const cpus = os.cpus()
+  //   return cpus.map((cpu, index) => {
+  //     const total = Object.values(cpu.times).reduce((acc, time) => acc + time, 0)
+  //     return {
+  //       cpu: index + 1,
+  //       user: (cpu.times.user / total) * 100,
+  //       nice: (cpu.times.nice / total) * 100,
+  //       sys: (cpu.times.sys / total) * 100,
+  //       idle: (cpu.times.idle / total) * 100,
+  //       irq: (cpu.times.irq / total) * 100,
+  //     }
+  //   })
+  // }
+  //
+  // async #getMemoryUsage() {
+  //   const total = os.totalmem()
+  //   const free = os.freemem()
+  //   const used = total - free
+  //   return {
+  //     total,
+  //     used,
+  //   }
+  // }
+  //
+  // async #getProcessList() {
+  //   const pm3: PM3 = await this.#app.container.make('pm3')
+  //   const usage = await pidusage(process.pid)
+  //   const nestMtxProcess = {
+  //     name: 'nestmtx',
+  //     pid: process.pid,
+  //     cpu: usage.cpu,
+  //     memory: usage.memory,
+  //     uptime: usage.elapsed,
+  //   }
+  //   const children = await pm3.stats()
+  //   return [nestMtxProcess, ...children]
+  // }
 
   get $descriptionOfList() {
     return 'Get the HTOP Report'
