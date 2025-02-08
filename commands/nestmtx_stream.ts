@@ -270,12 +270,12 @@ export default class NestmtxStream extends BaseCommand {
     })
   }
 
-  #validateRtpPacket(packet: Buffer) {
-    if (packet.length < 12) {
-      return false
-    }
-    return true
-  }
+  // #validateRtpPacket(packet: Buffer) {
+  //   if (packet.length < 12) {
+  //     return false
+  //   }
+  //   return true
+  // }
 
   #onStreamerUnixSocketConnection(socket: UnixSocket) {
     socket.on('data', (raw) => {
