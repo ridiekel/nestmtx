@@ -1,6 +1,6 @@
 import { ApiServiceModule } from '#services/api'
-import os from 'node:os'
-import pidusage from 'pidusage'
+// import os from 'node:os'
+// import pidusage from 'pidusage'
 
 import type { ApplicationService } from '@adonisjs/core/types'
 import type { PM3 } from '#services/pm3'
@@ -52,7 +52,7 @@ export default class HtopModule implements ApiServiceModule {
     const { action } = ctx.payload
     switch (action) {
       case 'start':
-        await pm3.start(ctx.entity)
+        // await pm3.start(ctx.entity)
         break
 
       case 'stop':
