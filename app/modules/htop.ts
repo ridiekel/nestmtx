@@ -21,20 +21,20 @@ export default class HtopModule implements ApiServiceModule {
   }
 
   async list() {
-    try {
-      const [cpu, memory, processes] = await Promise.all([
-        this.#getCpuUsage(),
-        this.#getMemoryUsage(),
-        this.#getProcessList(),
-      ])
-      return {
-        cpu,
-        memory,
-        processes,
-        paths: this.#app.mediamtx.getPaths(),
-      }
-    } catch (error) {
-      console.log(error)
+    // try {
+    //   const [cpu, memory, processes] = await Promise.all([
+    //     this.#getCpuUsage(),
+    //     this.#getMemoryUsage(),
+    //     this.#getProcessList(),
+    //   ])
+    //   return {
+    //     cpu,
+    //     memory,
+    //     processes,
+    //     paths: this.#app.mediamtx.getPaths(),
+    //   }
+    // } catch (error) {
+    //   console.log(error)
       return {
         cpu: [],
         memory: {
@@ -44,7 +44,7 @@ export default class HtopModule implements ApiServiceModule {
         processes: [],
         paths: this.#app.mediamtx.getPaths(),
       }
-    }
+    // }
   }
 
   async update(ctx: UpdateCommandContext) {
