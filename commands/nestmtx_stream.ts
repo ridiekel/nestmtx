@@ -299,18 +299,18 @@ export default class NestmtxStream extends BaseCommand {
 
   #onCameraUnixSocketConnection(socket: UnixSocket) {
     socket.on('data', (raw) => {
-      const valid = this.#validateRtpPacket(raw)
-      if (!valid) {
-        return
-      }
+      // const valid = this.#validateRtpPacket(raw)
+      // if (!valid) {
+      //   return
+      // }
       // console.log(raw)
       // writeFileSync(this.#streamerPassthroughFifo, raw)
-      if (this.#streamer) {
-        this.#packetsToOutputCount += 1
-        this.#stalled = false
+      // if (this.#streamer) {
+      //   this.#packetsToOutputCount += 1
+      //   this.#stalled = false
         // @ts-expect-error - this is correct
         this.#streamer.stdio[3].write(raw)
-      }
+      // }
     })
     socket.on('error', (error) => {
       logger.error(error)
